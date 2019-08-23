@@ -34,9 +34,9 @@ class ImageDataset(Dataset):
         self.df = df
         self.size = cfg['size']
         self.num_samples = self.df.shape[0]
-        self.fnames = self.df["id_code"].values
-        self.labels = self.df["diagnosis"].values.astype("int64")
-        self.num_classes = len(np.unique(self.labels))
+        self.fnames = self.df["id"].values
+        self.labels = self.df["label"].values.astype("int64") - 1
+        self.num_classes = cfg['num_classes']
         # self.labels = to_multi_label(self.labels, self.num_classes)  # [1]
         # self.labels = np.eye(self.num_classes)[self.labels]
         self.transform = get_transforms(phase, cfg)
@@ -53,15 +53,9 @@ class ImageDataset(Dataset):
     def __getitem__(self, idx):
         fname = self.fnames[idx]
         label = self.labels[idx]
-        path = os.path.join(self.root, fname.split('.')[0] + '.npy')
-        image = np.load(path)
-        #print(image.shape)
-        #filename, ext = os.path.splitext(path)
-        #if ext == ".jpeg" or ext == ".jpg":
-        #    image = jpeg.JPEG(path).decode()
-        #else:
-        #    image = Image.open(path)
-        #    image = np.array(image)
+        path = os.path.join(self.root, fname)
+        # image = np.array(Image.open(path))
+        image = cv2.imread(path)
         image = self.transform(image=image)["image"]
         return fname, image, label
 
@@ -96,110 +90,25 @@ def resampled(df, count_dict):
 
 def provider(phase, cfg):
     HOME = cfg['home']
-    if cfg['pretraining']:
-        df_path = cfg['old_df_path']
-    else:
-        df_path = cfg['new_df_path']
-    df = pd.read_csv(os.path.join(HOME, df_path))
-    #print(df['diagnosis'].value_counts())
+    df = pd.read_csv(os.path.join(HOME, cfg['df_path']))
     df['weight'] = 1 # [10]
-
-    if cfg['he_sampling']:
-        hard_examples = pd.read_csv(cfg['hard_df']).index.tolist()
-        df.at[hard_examples, 'weight'] = cfg['hard_ex_weight']
-
-    if cfg['tc_dups']:
-        '''remove dups before train/val split'''
-        bad_dups = np.load(os.path.join(HOME, cfg["bad_idx"]))
-        good_dups = np.load(os.path.join(HOME, cfg["dups_wsd"]))  # [3]
-        good_dups_df = df.iloc[good_dups] # to be added later on
-        all_dups = np.array(list(bad_dups) + list(good_dups))
-        df = df.drop(df.index[all_dups])
-
-
-    # remove class 0, subtract all by 1
-    #df = df[df['diagnosis'] != 0]
-    #df['diagnosis'] -= 1
-
-
-    if cfg['sample']: #used in old data training
-        count_dict = cfg['count_dict']
-        df = resampled(df, count_dict)
 
     #print(df['diagnosis'].value_counts())
     fold = cfg['fold']
     total_folds = cfg['total_folds']
     kfold = StratifiedKFold(total_folds, shuffle=True, random_state=69)
-    train_idx, val_idx = list(kfold.split(df["id_code"], df["diagnosis"]))[fold]
+    train_idx, val_idx = list(kfold.split(df["id"], df["label"]))[fold]
     train_df, val_df = df.iloc[train_idx], df.iloc[val_idx]
-
-    if cfg['add_old_samples'] and phase == "train":
-        sample_dict = cfg['sample_dict']
-        df_old = pd.read_csv(cfg['old_df_path'])
-        sampled_df_old = resampled(df_old, sample_dict)
-        train_df = train_df.append(sampled_df_old, ignore_index=False)
-
-    #'''test'''
-    #extra = pd.read_csv('data/2015.csv')
-    #sampled_extra = resampled(extra, cfg)
-    #train_df = train_df.append(sampled_extra, ignore_index=False)
-    #print(f'data dist:\n {train_df["diagnosis"].value_counts(normalize=True)}\n')
-    #'''test over'''
-
-    if cfg['messidor_in_train']:
-        mes_df = pd.read_csv(cfg['mes_df'])
-        mes_df = mes_df[mes_df.diagnosis != 3] # drop class 3, see [12]
-        mes_df['weight'] = 1
-        train_df = train_df.append(mes_df, ignore_index=True)
-
-    if cfg['idrid_in_train']:
-        idrid_df = pd.read_csv(cfg['idrid_df'])
-        idrid_df['weight'] = 1
-        train_df = train_df.append(idrid_df, ignore_index=True)
-        #df = df.append(mes_df, ignore_index=True)
-
-    #'''test'''
-    ## val set dist => public test set dist
-    ## line 170 modified too.
-
-    #sample_dict = {
-    #        2:    0.647303,
-    #        1:    0.185166,
-    #        1:    0.070539,
-    #        3:    0.058091,
-    #        4:    0.038900
-    #}
-
-    #count = {}
-    #for i, j in sample_dict.items():
-    #    count[i] = int(sample_dict[i] * 650) # so that, val size is ~20%
-
-    #def sample(obj):  # [5]
-    #    return obj.sample(n=count[obj.name], replace=False, random_state=69)
-
-    #val_df = df.groupby('diagnosis').apply(sample).reset_index(drop=True)
-    #train_df = df[~df['id_code'].isin(val_df.id_code.tolist())]
-
-    #'''test over'''
-
-    if 'folder' in cfg.keys():
-        # save for analysis, later on
-        train_df.to_csv(os.path.join(HOME, cfg['folder'], 'train.csv'), index=False)
-        val_df.to_csv(os.path.join(HOME, cfg['folder'], 'val.csv'), index=False)
 
     if phase == "train":
         df = train_df.copy()
     elif phase == "val":
         df = val_df.copy()
-    elif phase == "val_new": # [11]
-        df = pd.read_csv('data/train.csv')
 
     print(f"{phase}: {df.shape}")
-    print(f'Data dist:\n {df["diagnosis"].value_counts(normalize=True)}\n')
 
     df = df.sample(frac=1, random_state=69) # shuffle
 
-    #df = pd.read_csv(cfg['diff_path'])
 
     image_dataset = ImageDataset(df, phase, cfg)
 

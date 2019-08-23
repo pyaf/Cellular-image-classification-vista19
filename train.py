@@ -45,10 +45,8 @@ class Trainer(object):
         self.cfg["folder"] = self.folder
         # self.resume = self.cfg['resume']
         self.resume = self.args.resume
-        self.pretrained = self.cfg["pretrained"]
-        self.pretrained_path = self.cfg["pretrained_path"]
         self.batch_size = self.cfg["batch_size"]
-        self.accumulation_steps = {x: 64 // bs for x, bs in self.batch_size.items()}
+        self.accumulation_steps = {x: 32 // bs for x, bs in self.batch_size.items()}
         self.num_classes = self.cfg["num_classes"]
         self.top_lr = eval(self.cfg["top_lr"])
         self.ep2unfreeze = self.cfg["ep2unfreeze"]
@@ -58,7 +56,6 @@ class Trainer(object):
         self.patience = self.cfg["patience"]
         self.phases = self.cfg["phases"]
         self.start_epoch = 0
-        self.best_qwk = 0
         self.best_loss = float("inf")
         self.cuda = torch.cuda.is_available()
         torch.set_num_threads(12)
@@ -70,7 +67,8 @@ class Trainer(object):
         self.model_path = os.path.join(self.save_folder, "model.pth")
         self.ckpt_path = os.path.join(self.save_folder, "ckpt.pth")
         self.net = get_model(self.model_name, self.num_classes)
-        self.criterion = torch.nn.MSELoss()
+        #self.criterion = torch.nn.MSELoss()
+        self.criterion = torch.nn.CrossEntropyLoss()
         self.optimizer = optim.Adam(self.net.parameters(), lr=self.top_lr)
         # self.optimizer = RAdam(self.net.parameters(), lr=self.top_lr)
         # lr_lambda = lambda epoch: epoch // 5
@@ -79,7 +77,7 @@ class Trainer(object):
         )
         logger = logger_init(self.save_folder)
         self.log = logger.info
-        if self.resume or self.pretrained:
+        if self.resume:
             self.load_state()
         else:
             self.initialize_net()
@@ -103,16 +101,12 @@ class Trainer(object):
         if self.resume:
             path = self.resume_path
             self.log("Resuming training, loading {} ...".format(path))
-        elif self.pretrained:
-            path = self.pretrained_path
-            self.log("loading pretrained, {} ...".format(path))
         state = torch.load(path, map_location=lambda storage, loc: storage)
         self.net.load_state_dict(state["state_dict"])
 
         if self.resume:
             self.optimizer.load_state_dict(state["optimizer"])
             self.best_loss = state["best_loss"]
-            self.best_qwk = state["best_qwk"]
             self.start_epoch = state["epoch"] + 1
             if self.start_epoch > 5:
                 # self.base_lr = self.top_lr
@@ -132,12 +126,10 @@ class Trainer(object):
     def forward(self, images, targets):
         # pdb.set_trace()
         images = images.to(self.device)
-        # targets = targets.type(torch.LongTensor).to(self.device) # [1]
-        targets = targets.type(torch.FloatTensor).to(self.device)
-        targets = targets.view(-1, 1)  # [n] -> [n, 1] V. imp for MSELoss
+        targets = targets.type(torch.LongTensor).to(self.device) # [1]
+        targets = targets.flatten()
         outputs = self.net(images)
-        outputs = torch.clamp(outputs, 0, 4)
-        # outputs = torch.sigmoid(outputs) # no sigmoid for regression mode
+        #pdb.set_trace()
         loss = self.criterion(outputs, targets)
         return loss, outputs
 
@@ -166,13 +158,12 @@ class Trainer(object):
             running_loss += loss.item()
             meter.update(targets, outputs.detach())
             tk0.set_postfix(loss=((running_loss * accu_steps) / ((itr + 1))))
-        best_thresholds = meter.get_best_thresholds()
         epoch_loss = (running_loss * accu_steps) / total_batches
-        qwk = epoch_log(
+        acc = epoch_log(
             self.optimizer, self.log, self.tb, phase, epoch, epoch_loss, meter, start
         )
         torch.cuda.empty_cache()
-        return epoch_loss, qwk, best_thresholds
+        return epoch_loss, acc
 
     def train(self):
         t0 = time.time()
@@ -188,22 +179,18 @@ class Trainer(object):
             state = {
                 "epoch": epoch,
                 "best_loss": self.best_loss,
-                "best_qwk": self.best_qwk,
                 "state_dict": self.net.state_dict(),
                 "optimizer": self.optimizer.state_dict(),
             }
             torch.save(state, self.ckpt_path)  # [2]
             if "val_new" in self.phases:
                 self.iterate(epoch, "val_new")
-            val_loss, val_qwk, best_thresholds = self.iterate(epoch, "val")
-            state["best_thresholds"] = best_thresholds
+            val_loss, val_acc = self.iterate(epoch, "val")
             torch.save(state, self.ckpt_path)  # [2]
             self.scheduler.step(val_loss)
             if val_loss < self.best_loss:
-                # if val_qwk > self.best_qwk:
                 self.log("******** New optimal found, saving state ********")
                 state["best_loss"] = self.best_loss = val_loss
-                # state["best_qwk"] = self.best_qwk = val_qwk
                 torch.save(state, self.model_path)
             copyfile(
                 self.ckpt_path, os.path.join(self.save_folder, "ckpt%d.pth" % epoch)
@@ -228,6 +215,7 @@ class Trainer(object):
                 }
             """
             # self.log("\n" + "=" * 60 + "\n")
+            print()
 
 
 if __name__ == "__main__":
@@ -236,7 +224,7 @@ if __name__ == "__main__":
 
 
 """Footnotes
-[1]: Crossentropy loss functions expects targets to be in labels (not one-hot) and of type
+[1]: Crossentropy loss functions expects targets to be in labels (not one-hot) and of type, raw unnormalized score is expected as input
 LongTensor, BCELoss expects targets to be FloatTensor
 
 [2]: the ckpt.pth is saved after each train and val phase, val phase is neccessary becausue we want the best_threshold to be computed on the val set., Don't worry, the probability of your system going down just after a crucial training phase is low, just wait a few minutes for the val phase :p

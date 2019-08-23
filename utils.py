@@ -20,49 +20,6 @@ from pycm import ConfusionMatrix
 from extras import *
 
 
-class CM(ConfusionMatrix):
-    def __init__(self, *args):
-        ConfusionMatrix.__init__(self, *args)
-
-    def save(self, name, qwk, loss, **kwargs):
-        """ add `qwk` and `loss` to the saved obj,
-        Use json.load(fileobject) for reading qwk and loss values,
-        they won't be read by ConfusionMatrix class
-        """
-        status = self.save_obj(name, **kwargs)
-        obj_full_path = status["Message"]
-        with open(obj_full_path, "r") as f:
-            dump_dict = json.load(f)
-            dump_dict["qwk"] = qwk
-            dump_dict["loss"] = loss
-        json.dump(dump_dict, open(obj_full_path, "w"))
-
-
-def predict(X, coef):
-    # [0.15, 2.4, ..] -> [0, 2, ..]
-    X_p = np.copy(X)
-    for i, pred in enumerate(X_p):
-        if pred < coef[0]:
-            X_p[i] = 0
-        elif pred >= coef[0] and pred < coef[1]:
-            X_p[i] = 1
-        elif pred >= coef[1] and pred < coef[2]:
-            X_p[i] = 2
-        # else:
-        #    X_p[i] = 3
-        elif pred >= coef[2] and pred < coef[3]:
-            X_p[i] = 3
-        else:
-            X_p[i] = 4
-    return X_p.astype("int")
-
-
-def compute_score_inv(thresholds, predictions, targets):
-    predictions = predict(predictions, thresholds)
-    score = cohen_kappa_score(predictions, targets, weights="quadratic")
-    return 1 - score
-
-
 class Meter:
     def __init__(self, phase, epoch, save_folder):
         self.predictions = []
@@ -70,117 +27,61 @@ class Meter:
         self.phase = phase
         self.epoch = epoch
         self.save_folder = os.path.join(save_folder, "logs")
-        self.base_th = [0.5, 1.5, 2.5, 3.5]  #
 
     def update(self, targets, outputs):
         """targets, outputs are detached CUDA tensors"""
         # get multi-label to single label
-        # targets = torch.sum(targets, 1) - 1 # no multilabel target in regression
         targets = targets.type(torch.LongTensor)
-        outputs = outputs.flatten()  # [n, 1] -> [n]
-        # outputs = torch.sum((outputs > 0.5), 1) - 1
+        outputs = torch.argmax(outputs, dim=1).flatten()
 
-        # pdb.set_trace()
+        #pdb.set_trace()
         self.targets.extend(targets.tolist())
         self.predictions.extend(outputs.tolist())
-        # self.predictions.extend(torch.argmax(outputs, dim=1).tolist()) #[2]
-
-    def get_best_thresholds(self):
-        """Epoch over, let's get targets in np array [6]"""
-        self.targets = np.array(self.targets)
-        """ not using this function anymore """
-        return self.base_th
-
-        if self.phase == "train":
-            return self.base_th
-
-        """Used in the val phase of iteration, see [4]"""
-        self.predictions = np.array(self.predictions)
-        simplex = scipy.optimize.minimize(
-            compute_score_inv,
-            self.base_th,
-            args=(self.predictions, self.targets),
-            method="nelder-mead",
-        )
-        self.best_th = simplex["x"]
-        print("Best thresholds: %s" % self.best_th)
-        return self.best_th
 
     def get_cm(self):
-        # pdb.set_trace()
-        base_preds = predict(self.predictions, self.base_th)
-        base_qwk = cohen_kappa_score(self.targets, base_preds, weights="quadratic")
-        base_cm = CM(self.targets, base_preds)
-        return base_cm, base_qwk
-        """ not used """
-        if self.phase != "train":
-            best_preds = predict(self.predictions, self.best_th)
-            best_qwk = cohen_kappa_score(self.targets, best_preds, weights="quadratic")
-            best_cm = CM(self.targets, best_preds)
-            return base_cm, base_qwk, best_cm, best_qwk
+        targets = np.array(self.targets)
+        predictions = np.array(self.predictions)
+        cm = ConfusionMatrix(targets, predictions)
+        return cm
 
 
 def epoch_log(opt, log, tb, phase, epoch, epoch_loss, meter, start):
-    base_cm, base_qwk = meter.get_cm()
-    """
-    if phase == "train":
-        base_cm, base_qwk = meter.get_cm()
-    else:
-        base_cm, base_qwk, best_cm, best_qwk = meter.get_cm()
-        # take care of best metrics
-        acc, tpr, ppv, cls_tpr, cls_ppv = get_stats(best_cm)
-        metrics = [acc, best_qwk, tpr, ppv]
-        log_metrics(tb[phase], metrics, epoch, "best")
-        log("best: QWK: %0.4f | ACC: %0.4f | TPR: %0.4f | PPV: %0.4f"
-            % (best_qwk, acc, tpr, ppv))
-        log("Class TPR: %s" % cls_tpr)
-        log("Class PPV: %s" % cls_ppv)
-        best_cm.print_normalized_matrix()
-        obj_path = os.path.join(meter.save_folder, f"best_cm{phase}_{epoch}")
-        best_cm.save(obj_path, best_qwk, epoch_loss, save_stat=True, save_vector=True)
-        print()
-    """
+    cm = meter.get_cm()
 
     lr = opt.param_groups[-1]["lr"]
     # take care of base metrics
-    acc, tpr, ppv, f1, cls_tpr, cls_ppv, cls_f1 = get_stats(base_cm)
+    acc, tpr, ppv, f1, cls_tpr, cls_ppv, cls_f1 = get_stats(cm)
     log(
-        "QWK: %0.4f | ACC: %0.4f | TPR: %0.4f | PPV: %0.4f | F1: %0.4f"
-        % (base_qwk, acc, tpr, ppv, f1)
+        "ACC: %0.4f | TPR: %0.4f | PPV: %0.4f | F1: %0.4f"
+        % (acc, tpr, ppv, f1)
     )
-    log(f"Class TPR: {cls_tpr}")
-    log(f"Class PPV: {cls_ppv}")
-    log(f"Class F1: {cls_f1}")
-    base_cm.print_normalized_matrix()
+    #log(f"Class TPR: {cls_tpr}")
+    #log(f"Class PPV: {cls_ppv}")
+    #log(f"Class F1: {cls_f1}")
+    #cm.print_normalized_matrix()
     log(f"lr: {lr}")
 
     # tensorboard
     logger = tb[phase]
-
+    '''
     for cls in cls_tpr.keys():
         logger.log_value("TPR_%s" % cls, float(cls_tpr[cls]), epoch)
         logger.log_value("PPV_%s" % cls, float(cls_ppv[cls]), epoch)
         logger.log_value("F1_%s" % cls, float(cls_f1[cls]), epoch)
+    '''
+    if phase == "train": logger.log_value("lr", lr, epoch)
 
     logger.log_value("loss", epoch_loss, epoch)
-    if phase == "train":
-        logger.log_value("lr", lr, epoch)
-    metrics = [acc, base_qwk, tpr, ppv]
-    log_metrics(tb[phase], metrics, epoch, "base")
+    logger.log_value(f"{phase}_ACC", acc, epoch)
+    logger.log_value(f"{phase}_TPR", tpr, epoch)
+    logger.log_value(f"{phase}_PPV", ppv, epoch)
+
 
     # save pycm confusion
-    obj_path = os.path.join(meter.save_folder, f"base_cm{phase}_{epoch}")
-    base_cm.save(obj_path, base_qwk, epoch_loss, save_stat=True, save_vector=True)
+    obj_path = os.path.join(meter.save_folder, f"cm{phase}_{epoch}")
+    cm.save_obj(obj_path, save_stat=True, save_vector=True)
 
-    return base_qwk
-
-
-def log_metrics(logger, metrics, epoch, prefix):
-    acc, qwk, tpr, ppv = metrics
-    logger.log_value(f"{prefix}_ACC", acc, epoch)
-    logger.log_value(f"{prefix}_QWK", qwk, epoch)
-    logger.log_value(f"{prefix}_TPR", tpr, epoch)
-    logger.log_value(f"{prefix}_PPV", ppv, epoch)
+    return acc
 
 
 def get_stats(cm):
