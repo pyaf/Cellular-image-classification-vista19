@@ -74,7 +74,10 @@ if __name__ == "__main__":
     parser = test_parser()
     args = parser.parse_args()
     predict_on = args.predict_on
-    start_epoch, end_epoch = args.epoch_range
+    epochs = args.epoch_range
+    if len(epochs) == 1:
+        epochs = [epochs, epochs]
+    start_epoch, end_epoch = epochs
     cfg = load_cfg(args)
 
     cfg['phase'] = "test" # "train" -> augmentations
