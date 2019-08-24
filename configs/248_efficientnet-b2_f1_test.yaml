@@ -11,7 +11,7 @@ he_sampling: False
 hard_ex_weight: 2
 hard_df: weights/118_efficientnet-b5_f1_postraug2/diff.csv
 num_samples: None
-model_name: efficientnet-b3
+model_name: efficientnet-b2
 ext_text: test
 mean: (0.485, 0.456, 0.406)
 std: (0.229, 0.224, 0.225)
