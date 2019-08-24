@@ -1,7 +1,7 @@
 remark: a
 home: /media/ags/DATA/CODE/vista/
 #home: /home/eee/ug/15084015/aptos/
-fold: 1
+fold: 0
 total_folds: 5
 size: 224
 top_lr: 1e-3
@@ -11,7 +11,7 @@ he_sampling: False
 hard_ex_weight: 2
 hard_df: weights/118_efficientnet-b5_f1_postraug2/diff.csv
 num_samples: None
-model_name: resnext101_32x4d:e
+model_name: se_resnext101_32x4d
 ext_text: test
 mean: (0.485, 0.456, 0.406)
 std: (0.229, 0.224, 0.225)
@@ -21,7 +21,7 @@ data_folder: data/train_final/
 
 phases: ["train", "val"]
 batch_size:
-    train: 16
+    train: 8
     val: 8
     test: 8
 
