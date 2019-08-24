@@ -7,6 +7,9 @@
 * `248_efficientnet-b0_f1_test`: First model, 224x, B0, 1e-5, 50 epochs.
 training looks good
 ckpt50: 0.845 on LB, same with ckpt80, train/val: 0.86/0.90
+* b3 is 0.90 on LB, 0.98 on train set. overfitting.
+* b2 b5 are 0.87
+
 
 
 

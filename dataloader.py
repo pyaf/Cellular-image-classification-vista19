@@ -57,6 +57,7 @@ class ImageDataset(Dataset):
         # image = np.array(Image.open(path))
         #print(path)
         image = cv2.imread(path)
+        image = resize_sa(image, self.size)
         image = self.transform(image=image)["image"]
         return fname, image, label
 
