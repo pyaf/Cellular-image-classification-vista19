@@ -75,8 +75,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     predict_on = args.predict_on
     epochs = args.epoch_range
-    if len(epochs) == 1:
-        epochs = [epochs, epochs]
+    if len(epochs) == 1: epochs = epochs * 2 # [43] -> [43, 43]
     start_epoch, end_epoch = epochs
     cfg = load_cfg(args)
 
