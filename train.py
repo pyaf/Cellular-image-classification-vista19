@@ -19,7 +19,7 @@ from tensorboard_logger import Logger
 from utils import *
 from dataloader import provider
 from shutil import copyfile
-from models import Model, get_model
+from models import get_model
 from extras import *
 from opt import RAdam
 from pathlib import Path
