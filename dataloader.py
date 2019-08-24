@@ -206,6 +206,49 @@ if __name__ == "__main__":
     #pdb.set_trace()
 
 
+
+
+
+
+
+    dataloader = provider(phase, cfg)
+    ''' train val set sanctity
+    #pdb.set_trace()
+    tdf = dataloader.dataset.df
+    phase = "val"
+    dataloader = provider(phase, cfg)
+    vdf = dataloader.dataset.df
+    print(len([x for x in tdf.id_code.tolist() if x in vdf.id_code.tolist()]))
+    exit()
+    '''
+    total_labels = []
+    total_len = len(dataloader)
+    from collections import defaultdict
+    fnames_dict = defaultdict(int)
+    for idx, batch in enumerate(dataloader):
+        fnames, images, labels = batch
+        for fname in fnames:
+            fnames_dict[fname] += 1
+
+        print("%d/%d" % (idx, total_len), images.shape, labels.shape)
+        total_labels.extend(labels.tolist())
+        #pdb.set_trace()
+    print(np.unique(total_labels, return_counts=True))
+    diff = time.time() - start
+    print('Time taken: %02d:%02d' % (diff//60, diff % 60))
+
+    print(np.unique(list(fnames_dict.values()), return_counts=True))
+    #pdb.set_trace()
+
+
+
+
+
+
+
+
+
+
 """
 Footnotes:
 
