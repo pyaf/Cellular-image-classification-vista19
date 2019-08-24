@@ -53,14 +53,10 @@ def test_parser():
         help="predict on train or test set, options: test or train",
         default="test",
     )
-    parser.add_argument(
-        "-s", "--size", dest="size", help="image size to use", default=256
-    )
-
     return parser
 
 
-def get_predictions(model, testset, tta):
+def get_predictions(model, testset):
     """return all predictions on testset in a list"""
     predictions = []
     for i, batch in enumerate(tqdm(testset)):
@@ -81,56 +77,45 @@ if __name__ == "__main__":
     start_epoch, end_epoch = args.epoch_range
     cfg = load_cfg(args)
 
-    cfg['phase'] = args.predict_on
+    cfg['phase'] = "test" # "train" -> augmentations
+    cfg['data_folder'] = 'data/test_final/'
     if predict_on == "train":
         cfg['sample_submission'] = "data/train.csv"
-        cfg['data_folder'] = "data/all_images/"
+        cfg['data_folder'] = "data/train_final/"
 
     tta = 0  # number of augs in tta
 
     use_cuda = True
     device = torch.device("cuda" if use_cuda else "cpu")
-    size = args.size
+
     test_dataloader = testprovider(cfg)
 
     model = get_model(cfg['model_name'], cfg['num_classes'], pretrained=None)
     model.to(device)
     model.eval()
     folder = os.path.splitext(os.path.basename(args.filepath))[0]
-    model_folder_path = os.path.join( 'weights', folder)
-    npy_folder = os.path.join(model_folder_path, f"{predict_on}_npy/{size}")
+    model_folder_path = os.path.join('weights', folder)
 
-    mkdir(npy_folder)
-
-    print(f"Saving predictions at: {npy_folder}")
+    print(f"Saving predictions at: {model_folder_path}")
     print(f"From epoch {start_epoch} to {end_epoch}")
     print(f"Using tta: {tta}\n")
-
-    base_thresholds = np.array([0.5, 1.5, 2.5, 3.5])
-    y_test = pd.read_csv('weights/submission829.csv')['diagnosis'].values
+    df = pd.read_csv(cfg['sample_submission'])
+    y_train = pd.read_csv(cfg['df_path'])['label'].values
     for epoch in range(start_epoch, end_epoch + 1):
         print(f"Using ckpt{epoch}.pth")
         ckpt_path = os.path.join(model_folder_path, "ckpt%d.pth" % epoch)
         state = torch.load(ckpt_path, map_location=lambda storage, loc: storage)
         model.load_state_dict(state["state_dict"])
-        preds = get_predictions(model, test_dataloader, tta)
-        best_thresholds = state["best_thresholds"]
-        cls_preds = predict(preds, base_thresholds)
-        print("base:", np.unique(cls_preds, return_counts=True)[1])
-        if cfg['phase'] == 'test':
-            score = cohen_kappa_score(y_test, cls_preds, weights="quadratic")
-            acc = accuracy_score(y_test, cls_preds)
-            print(f'base qwk: {score}, acc: {acc}')
-            cm = ConfusionMatrix(y_test, cls_preds.flatten())
-            cls_f1 = sanitize(cm.class_stat["F1"])
-            print(f'F1: {cls_f1} \n')
-        """
-        print(f"Best thresholds: {best_thresholds}")
-        pred1 = predict(preds, best_thresholds)
-        print("best:", np.unique(pred1, return_counts=True)[1])
-        """
-        mat_to_save = [preds, best_thresholds]
-        np.save(os.path.join(npy_folder, f"{predict_on}_ckpt{epoch}.npy"), mat_to_save)
+        preds = get_predictions(model, test_dataloader)
+        cls_preds = np.argmax(preds, axis=1).flatten() + 1 # +1 is fucking imp
+        #print(np.unique(cls_preds, return_counts=True)[1])
+        if predict_on == 'train':
+            cm = ConfusionMatrix(y_train, cls_preds)
+            acc = cm.overall_stat["Overall ACC"]
+            print(f'ACC: {acc}\n')
+        df.loc[:, "label"] = cls_preds
+        path = os.path.join(model_folder_path, f"{predict_on}_ckpt{epoch}.csv")
+        df.to_csv(path, index=False)
         print("Predictions saved!")
 
 

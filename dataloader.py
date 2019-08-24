@@ -55,6 +55,7 @@ class ImageDataset(Dataset):
         label = self.labels[idx]
         path = os.path.join(self.root, fname)
         # image = np.array(Image.open(path))
+        #print(path)
         image = cv2.imread(path)
         image = self.transform(image=image)["image"]
         return fname, image, label
@@ -138,11 +139,8 @@ def testprovider(cfg):
     df_path = cfg['sample_submission']
     df = pd.read_csv(os.path.join(HOME, df_path))
     phase = cfg['phase']
-    if phase == "test":
-        df['id_code'] += '.png'
-    batch_size = cfg['batch_size']['test']
+    batch_size = cfg['batch_size'][phase]
     num_workers = cfg['num_workers']
-
 
     dataloader = DataLoader(
         ImageDataset(df, phase, cfg),

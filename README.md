@@ -4,6 +4,13 @@
 
 # Models on training:
 
+* `248_efficientnet-b0_f1_test`: First model, 224x, B0, 1e-5, 50 epochs.
+training looks good
+ckpt50: 0.845 on LB, same with ckpt80, train/val: 0.86/0.90
+
+
+
+
 
 
 

@@ -72,9 +72,9 @@ def epoch_log(opt, log, tb, phase, epoch, epoch_loss, meter, start):
     if phase == "train": logger.log_value("lr", lr, epoch)
 
     logger.log_value("loss", epoch_loss, epoch)
-    logger.log_value(f"{phase}_ACC", acc, epoch)
-    logger.log_value(f"{phase}_TPR", tpr, epoch)
-    logger.log_value(f"{phase}_PPV", ppv, epoch)
+    logger.log_value(f"ACC", acc, epoch)
+    logger.log_value(f"TPR", tpr, epoch)
+    logger.log_value(f"PPV", ppv, epoch)
 
 
     # save pycm confusion
