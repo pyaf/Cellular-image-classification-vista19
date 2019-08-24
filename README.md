@@ -10,9 +10,16 @@ ckpt50: 0.845 on LB, same with ckpt80, train/val: 0.86/0.90
 * b3 is 0.90 on LB, 0.98 on train set. overfitting.
 * b2 b5 are 0.87
 
+resizing images to square is shitty.
 
 
+* `248_efficientnet-b3_f0_test`: with resize_sa, padifneeded border_mode=1, size=300.
 
+ckpt25: train/val: 0.97/0.97, LB: 0.9278
+ckpt50 and 20 give lower scores.
+*strang* ensemble of b3-f1's 0.90 and b3-f0's 0.92 gives: 0.878
+
+* `248_efficientnet-b3_f2_test`: with strong_aug()
 
 
 

@@ -136,8 +136,7 @@ def get_transforms(phase, cfg):
                 ShiftScaleRotate(
                     shift_limit=0.3, scale_limit=0.3, rotate_limit=120, p=0.9
                 ),
-                RandomBrightnessContrast(0.1, 0.1, p=0.5),
-
+                strong_aug(),
             ]
         )
     list_transforms.extend(

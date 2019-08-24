@@ -1,11 +1,11 @@
 import pandas as pd
 import numpy as np
 
-ensemble_path = 'weights/ensembleb3b5.csv'
+ensemble_path = 'weights/ensembleb3f01.csv'
 
 paths = [
         'weights/248_efficientnet-b3_f1_test/test_ckpt40.csv',
-        'weights/248_efficientnet-b5_f1_test/test_ckpt50.csv'
+        'weights/248_efficientnet-b3_f0_test/test_ckpt25.csv',
         ]
 
 labels = np.zeros(15984)
