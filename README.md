@@ -26,11 +26,14 @@ straug without motionblur, optical distortion etc works, all of it doesn't
 * `248_inceptionresnetv2_f0_straug`:
 
 senet154
-inceptionv4
-SE-ResNeXt101_32x4d
+[x] inceptionv4
+[x] SE-ResNeXt101_32x4d
 resnet101
 
+* inceptionv4: ckpt40: LB 0.8817
+* resnext101_32x4d: ckpt38: LB 0.9226
 
+Total submission today: 2
 
 
 # Questions and Ideas:

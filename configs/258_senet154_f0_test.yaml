@@ -27,7 +27,7 @@ batch_size:
 num_workers: 12
 num_classes: 14
 ep2unfreeze: 2
-num_epochs: 40
+num_epochs: 50
 base_lr: None
 momentum: 0.95
 patience: 3

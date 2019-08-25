@@ -11,7 +11,7 @@ he_sampling: False
 hard_ex_weight: 2
 hard_df: weights/
 num_samples: None
-model_name: inceptionresnetv2
+model_name: resnet101
 ext_text: test
 mean: (0.485, 0.456, 0.406)
 std: (0.229, 0.224, 0.225)
@@ -28,7 +28,7 @@ batch_size:
 num_workers: 12
 num_classes: 14
 ep2unfreeze: 2
-num_epochs: 40
+num_epochs: 50
 base_lr: None
 momentum: 0.95
 patience: 3
