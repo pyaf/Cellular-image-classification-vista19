@@ -33,7 +33,18 @@ resnet101
 * inceptionv4: ckpt40: LB 0.8817
 * resnext101_32x4d: ckpt38: LB 0.9226
 
-Total submission today: 2
+*batch size matters a lot, in terms of speed, keep it max you can (obviously max possible here is 32)*
+
+*bugfix*
+
+resuming the model after ep2unfreeze, makes all the params untrainable, execpt the top !!!
+
+>>>>> TTA??
+
+
+*Total submission today: 2*
+
+
 
 
 # Questions and Ideas:

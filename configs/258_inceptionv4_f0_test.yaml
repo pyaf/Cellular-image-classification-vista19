@@ -21,7 +21,7 @@ data_folder: data/train_final/
 
 phases: ["train", "val"]
 batch_size:
-    train: 8
+    train: 16
     val: 8
     test: 8
 
